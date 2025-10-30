@@ -1,4 +1,5 @@
 import React from 'react';
+import { Text } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { TabParamList } from '../types/navigation';
 import { Colors } from '../constants/Colors';
@@ -112,8 +113,8 @@ interface TabIconProps {
 
 function TabIcon({ emoji, color }: TabIconProps) {
   return (
-    <span style={{ fontSize: 24, opacity: color === Colors.tabBarActive ? 1 : 0.6 }}>
+    <Text style={{ fontSize: 24, opacity: color === Colors.tabBarActive ? 1 : 0.6 }}>
       {emoji}
-    </span>
+    </Text>
   );
 }

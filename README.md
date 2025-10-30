@@ -52,16 +52,32 @@ npm install -g expo-cli
 
 ```bash
 # 開発サーバー起動
-npm start
+npx expo start
+
+# キャッシュをクリアして起動（推奨）
+npx expo start --clear
 
 # iOS シミュレータで起動
-npm run ios
+npx expo start --ios
 
 # Android エミュレータで起動
-npm run android
+npx expo start --android
+```
 
-# Webブラウザで起動
-npm run web
+### トラブルシューティング
+
+問題が発生した場合は [QUICK_START.md](./QUICK_START.md) の詳細なトラブルシューティングガイドを参照してください。
+
+**クイックフィックス**:
+```bash
+# すべてのプロセスを停止
+pkill -9 -f "expo"
+
+# キャッシュをクリア
+rm -rf .expo node_modules/.cache
+
+# 再起動
+npx expo start --clear
 ```
 
 ### Expo Go での動作確認
@@ -78,26 +94,34 @@ npm run web
 Mindful_Rhythm/
 ├── src/
 │   ├── screens/              # 画面コンポーネント
-│   │   ├── HomeScreen.tsx
-│   │   ├── SleepTrackerScreen.tsx
-│   │   ├── TaskJournalScreen.tsx
-│   │   ├── StatisticsScreen.tsx
-│   │   └── SettingsScreen.tsx
+│   │   ├── HomeScreen.tsx              ✅ 実装済み（DB連携はWeek 4）
+│   │   ├── SleepTrackerScreen.tsx      ✅ 完全実装済み（増田さん担当）
+│   │   ├── TaskJournalScreen.tsx       ✅ 完全実装済み（藤川さん担当）
+│   │   ├── StatisticsScreen.tsx        ⏳ Week 5-6で実装予定
+│   │   └── SettingsScreen.tsx          ⏳ Week 5-6で実装予定
 │   ├── components/           # 共通コンポーネント
+│   │   └── EmotionPicker.tsx           ✅ 完全実装済み（藤川さん担当）
 │   ├── navigation/           # ナビゲーション設定
-│   │   ├── AppNavigator.tsx
-│   │   └── TabNavigator.tsx
+│   │   ├── AppNavigator.tsx            ✅ 実装済み
+│   │   └── TabNavigator.tsx            ✅ 実装済み
 │   ├── services/             # ビジネスロジック
+│   │   ├── database.ts                 ✅ 完全実装済み（CRUD操作）
+│   │   ├── sleepScoreCalculator.ts     ✅ 完全実装済み（増田さん担当）
+│   │   └── adviceGenerator.ts          ✅ 完全実装済み（増田さん担当）
 │   ├── types/                # TypeScript型定義
-│   │   ├── database.ts
-│   │   └── navigation.ts
+│   │   ├── database.ts                 ✅ 実装済み
+│   │   └── navigation.ts               ✅ 実装済み
 │   ├── utils/                # ユーティリティ
+│   │   └── dateFormatter.ts            ✅ 完全実装済み
 │   └── constants/            # 定数
-│       ├── Colors.ts
-│       └── Typography.ts
+│       ├── Colors.ts                   ✅ 実装済み
+│       └── Typography.ts               ✅ 実装済み
 ├── assets/                   # 画像・フォント
 ├── docs/                     # ドキュメント
-├── App.tsx                   # エントリーポイント
+│   ├── 002-requirements_definition_v0.1.md  ✅ 要件定義書
+│   ├── 実装タスクリスト_増田藤川.md            ✅ タスクリスト
+│   └── 実装ガイド_増田藤川.md                  ✅ 実装手順書
+├── App.tsx                   # エントリーポイント（✅ DB初期化済み）
 ├── package.json
 ├── tsconfig.json
 └── README.md
@@ -143,23 +167,29 @@ npm test -- --watch
 
 ## 📊 開発進捗
 
-### Week 1-2: 環境構築・基礎学習 ✅
+### Week 1-2: 環境構築・基礎学習 ✅ 完了
 - [x] Expo環境構築
 - [x] React Navigation設定
 - [x] TypeScript型定義
 - [x] 基本画面レイアウト
-- [ ] SQLite初期化スクリプト
+- [x] SQLite初期化スクリプト ✅ **NEW**
+- [x] 日付ユーティリティ関数 ✅ **NEW**
 
-### Week 3-4: コア機能実装（予定）
-- [ ] 睡眠記録画面
-- [ ] 睡眠スコア算出ロジック
-- [ ] タスク管理画面
-- [ ] データベース連携
+### Week 3-4: コア機能実装 🔄 進行中
+- [x] 睡眠記録画面 ✅ **完全実装済み（増田さん担当）**
+- [x] 睡眠スコア算出ロジック ✅ **完全実装済み（増田さん担当）**
+- [x] タスク管理画面 ✅ **完全実装済み（藤川さん担当）**
+- [x] 感情選択モーダル ✅ **完全実装済み（藤川さん担当）**
+- [x] データベースCRUD操作 ✅ **完全実装済み**
+- [ ] ホーム画面とDB連携（増田さん実装予定）
+- [ ] 統合テスト（全機能連携確認）
 
 ### Week 5-6: 拡張機能実装（予定）
 - [ ] グラフ分析画面
 - [ ] 睡眠日記画面
 - [ ] AIアドバイス生成
+- [ ] キャラクター表情変化
+- [ ] ホーム画面背景変化
 
 ---
 
@@ -192,13 +222,20 @@ npm test -- --watch
 
 ## 📄 ドキュメント
 
-- [要件定義書](./002-requirements_definition_v0.1.md)
-- [企画・範囲確定](./001-plan_v0.1.md)
-- [現状分析](./004-current_state_v0.1.md)
-- [ギャップ分析](./005-gap_analysis_v0.1.md)
-- [実現可能性評価](./006-feasibility_v0.1.md)
-- [価値評価](./007-value_eval_v0.1.md)
-- [用語集](./用語集.md)
+### 要件定義フェーズ
+- [要件定義書](./docs/002-requirements_definition_v0.1.md) - 全機能の詳細仕様
+- [企画・範囲確定](./docs/001-plan_v0.1.md)
+- [現状分析](./docs/004-current_state_v0.1.md)
+- [ギャップ分析](./docs/005-gap_analysis_v0.1.md)
+- [実現可能性評価](./docs/006-feasibility_v0.1.md)
+- [価値評価](./docs/007-value_eval_v0.1.md)
+
+### 実装フェーズ ✅ **NEW**
+- [実装タスクリスト（増田さん・藤川さん）](./docs/実装タスクリスト_増田藤川.md) - 20タスクの詳細リスト
+- [実装ガイド（増田さん・藤川さん）](./docs/実装ガイド_増田藤川.md) - ステップバイステップ手順書
+
+### その他
+- [用語集](./docs/用語集.md)
 
 ---
 
