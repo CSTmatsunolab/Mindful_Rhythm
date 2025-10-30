@@ -1,0 +1,408 @@
+画面設計書（モバイルアプリ版）
+
+プロジェクト名：Mindful Rhythm（マインドフル・リズム）
+版数：v1.0（2025-10-23）
+作成者：〇〇ゼミ開発チーム
+
+0. 本書の目的
+
+要件定義に基づき、各画面のUI/UX・入力仕様・データ項目・遷移を定義する
+
+実装担当者・テスター・デザイナー間の共通認識を確立する
+
+1. 画面一覧（対象範囲）
+
+起動画面（Splash）
+
+ログイン／新規登録
+
+ホーム（Dashboard）
+
+睡眠記録（Sleep Tracker）
+
+タスク管理（Task Journal）
+
+グラフ分析（Statistics）
+
+睡眠日記（Sleep Diary）
+
+設定（Settings）
+
+モーダル群：
+9.1 感情選択モーダル（Emotion Picker）
+9.2 睡眠環境入力モーダル（Sleep Environment）
+9.3 アドバイス表示モーダル（AI Advice）
+
+2. 共通仕様
+2.1 共通レイアウト
+
+ナビゲーション：Bottom Tab（ホーム／睡眠／タスク／グラフ／設定）
+
+セーフエリア：iOS/Androidのノッチ対応
+
+カラー：
+
+プライマリ #0F172A（夜ネイビー）／アクセント #F59E0B（朝オレンジ）
+
+成功 #22C55E／警告 #F59E0B／エラー #EF4444
+
+フォント：Noto Sans JP（本文14sp、見出し18–24sp）
+
+2.2 共通コンポーネント（ID命名規則）
+
+ボタン：btn_<画面>_<機能>（例：btn_home_to_sleep）
+
+入力：inp_<画面>_<項目>（例：inp_sleep_bedtime）
+
+表示：lbl_, card_, chip_, icon_
+
+グラフ：chart_<画面>_<種別>
+
+モーダル：modal_<機能>
+
+2.3 状態・バリデーション
+
+時刻入力：24hフォーマット必須、waketime > bedtime（翌日またぎは+24h補正）
+
+テキスト入力：絵文字可、上限500字（メモ、日記）
+
+選択必須：気分／感情選択は最低1つ
+
+2.4 アクセシビリティ
+
+重要要素にはaccessibilityLabel必須
+
+コントラスト比 4.5:1以上（主要テキスト）
+
+重要通知はバイブ＋トースト併用可
+
+2.5 データバインディング（ローカルDB）
+
+sleep_records(id, date, bedtime, waketime, score, tags, dream, mood)
+
+tasks(id, date, task, status, emotion)
+
+user_mood(id, date, morning_mood, night_mood)
+
+ai_advice(id, date, advice_text)
+
+3. 画面詳細
+3.1 起動画面（Splash）
+
+目的：ロゴ表示／DB初期化／初回導線
+
+主要要素
+
+img_logo（中央）
+
+lbl_app_name（副題テキスト）
+
+状態
+
+T=0–3s 表示 → 自動遷移（ログイン状態で分岐）
+
+遷移
+
+未ログイン → ログイン
+
+ログイン済み → ホーム
+
+例外：DB初期化失敗→toast_error_init表示→再試行
+
+3.2 ログイン／新規登録
+
+目的：ユーザ識別（将来クラウド同期見据え）
+
+要素（共通）
+
+inp_auth_name（任意、将来の同期時に使用）
+
+inp_auth_email（形式チェック）
+
+inp_auth_password（8文字以上）
+
+btn_auth_login / btn_auth_register / btn_auth_guest
+
+バリデーション
+
+Email RFC準拠、Pw 8–64、名前 1–50
+
+失敗時：lbl_error_authに文言表示
+
+遷移：成功 → ホーム
+
+3.3 ホーム（Dashboard）
+
+目的：当日の概要確認と各機能へのハブ
+
+レイアウト
+
+Header：lbl_greeting, icon_avatar
+
+Main：
+
+card_sleep_score（円形ゲージ、score 0–100）
+
+chip_today_mood（朝／夜の気分）
+
+card_today_tasks（今日のタスク3件＋進捗バー）
+
+img_character_sleepin（スリーピン状態）
+
+Footer：Bottom Tab
+
+操作
+
+btn_home_to_sleep → 睡眠記録
+
+btn_home_to_tasks → タスク管理
+
+btn_home_to_stats → グラフ分析
+
+データ
+
+sleep_recordsの最新日付を読み込み、score表示
+
+今日のtasks件数／完了率 ％化
+
+3.4 睡眠記録（Sleep Tracker）
+
+目的：就寝・起床入力／スコア自動算出／環境記録
+
+レイアウト
+
+inp_sleep_bedtime（time picker）
+
+inp_sleep_waketime（time picker）
+
+chip_env_exercise, chip_env_caffeine, chip_env_bath, chip_env_temp
+
+btn_sleep_calc_score
+
+lbl_sleep_score_value（ゲージ連動）
+
+btn_sleep_open_advice（→アドバイスモーダル）
+
+バリデーション
+
+waketimeがbedtime以前なら+24h補正
+
+スコア算出：
+
+score = Σ(各指標×重み)
+指標: total_hours, deep_ratio(暫定), awakenings(手入力/将来自動), sleep_latency(手入力),
+      env_bonus(運動/カフェイン/入浴/室温)
+
+
+保存
+
+btn_sleep_save押下でsleep_recordsUpsert（日付キー）
+
+遷移
+
+btn_sleep_open_env → 睡眠環境入力モーダル
+
+btn_sleep_open_advice → アドバイスモーダル
+
+3.5 タスク管理（Task Journal）
+
+目的：ToDo作成／完了／感情付与／睡眠改善課題の提示
+
+レイアウト
+
+list_tasks_today（カード表示：タイトル、状態、感情）
+
+btn_task_add（FAB）
+
+switch_show_completed（完了表示切替）
+
+「今日の睡眠改善課題」：card_sleep_mission（例：「寝る1時間前はスマホ禁止」）
+
+詳細カード（タップで展開）
+
+inp_task_title（必須 1–60）
+
+inp_task_note（任意 0–200）
+
+btn_task_done → modal_emotion_picker
+
+保存：tasksに日付別でInsert/Update
+
+視覚効果：完了時にimg_character_sleepinアニメーション
+
+3.6 グラフ分析（Statistics）
+
+目的：週間/月間の推移と相関可視化
+
+レイアウト
+
+tab_week / tab_month
+
+chart_stats_score_line（スコア折れ線）
+
+chart_stats_sleep_hours_bar（睡眠時間棒）
+
+chart_stats_corr_task（タスク達成率×スコア散布図）
+
+lbl_best_day, lbl_avg_score
+
+インタラクション
+
+タップで当日の詳細ツールチップ
+
+週⇄月タブ切替は状態保持
+
+3.7 睡眠日記（Sleep Diary）
+
+目的：夢／不安／感情の記録、CBT-I支援
+
+レイアウト
+
+inp_diary_text（上限500）
+
+btn_diary_voice（音声入力任意）
+
+chip_diary_emotions（複数可）
+
+btn_diary_save
+
+list_diary_history（過去ログ）
+
+保存：sleep_records.dream／user_mood.night_moodを日付紐付け更新
+
+追加：btn_diary_ai_comment → AIコメント（将来機能）
+
+3.8 設定（Settings）
+
+目的：通知・テーマ・情報
+
+レイアウト
+
+switch_theme_dark（夜/朝モード）
+
+time_bedtime_reminder（ローカル通知）
+
+btn_data_export（JSONエクスポート）
+
+btn_about（開発者情報）
+
+通知：time_bedtime_reminder設定でローカル通知を登録／更新
+
+4. モーダル詳細
+4.1 感情選択モーダル（Emotion Picker）
+
+要素：🙂 😌 😫 😡 😭 😴（chip_emotion_*）
+
+仕様：1つ必須、タップで即決定→tasks.emotion更新
+
+4.2 睡眠環境入力モーダル（Sleep Environment）
+
+要素：運動/カフェイン/入浴/室温（トグル＋詳細）
+
+保存：sleep_records.tags（配列）に保持
+
+4.3 アドバイス表示モーダル（AI Advice）
+
+要素：
+
+lbl_advice_title（例：入眠潜時が長い→呼吸法推奨）
+
+btn_play_bgm, btn_breathing_guide, btn_stretch_guide
+
+保存：実行ログをai_adviceへ任意保存（将来分析用）
+
+5. 入出力仕様（主要フィールド定義）
+画面/項目	型	必須	検証	保存先
+bedtime	time	○	00:00–29:59	sleep_records.bedtime
+waketime	time	○	00:00–29:59	sleep_records.waketime
+score	int	自動	0–100	sleep_records.score
+tags	string[]	任意	値域固定	sleep_records.tags
+task.title	string	○	1–60	tasks.task
+task.status	enum	○	todo/done	tasks.status
+task.emotion	emoji	任意	値域固定	tasks.emotion
+diary.text	string	任意	0–500	sleep_records.dream
+mood.morning/night	emoji	任意	値域固定	user_mood.*
+6. 例：保存データ（JSONスナップショット）
+{
+  "sleep_records": [
+    {
+      "date": "2025-10-22",
+      "bedtime": "23:45",
+      "waketime": "07:10",
+      "score": 84,
+      "tags": ["運動", "カフェインなし", "入浴"],
+      "dream": "橋を渡る夢",
+      "mood": "🙂"
+    }
+  ],
+  "tasks": [
+    {
+      "id": "t_20251022_01",
+      "date": "2025-10-22",
+      "task": "寝る1時間前はスマホ禁止",
+      "status": "done",
+      "emotion": "😌"
+    }
+  ],
+  "user_mood": [
+    { "date": "2025-10-22", "morning_mood": "🙂", "night_mood": "😌" }
+  ]
+}
+
+7. エラーハンドリング／トースト文言例
+
+入力時刻不正：「起床時刻は就寝時刻より後（翌日を含む）に設定してください」
+
+必須未入力：「必須項目が未入力です」
+
+保存失敗：「ローカル保存に失敗しました。再度お試しください」
+
+8. 分析・イベント計測（将来）
+
+evt_sleep_saved（日付、score、tags）
+
+evt_task_done（emotion）
+
+evt_advice_used（type）
+
+9. 画面ごとの受け入れ条件（抜粋）
+
+睡眠記録
+
+就寝・起床入力後、「スコア計算」を押すと1秒以内にスコアが表示される
+
+タグ選択の有無でスコアが±影響する（例：運動 +2、カフェイン -4 など単純加点）
+
+保存後、ホームのスコアカードが更新される
+
+タスク管理
+
+タスク作成→即リスト反映
+
+完了時に感情モーダルが表示され、選択で保存される
+
+完了率がホームと統計画面に即時反映
+
+グラフ分析
+
+直近7日/30日のスコアと睡眠時間が表示される
+
+散布図で達成率×スコアの関係が視覚化される
+
+10. 単体テスト観点（例）
+
+就寝23:00／起床06:00 → 7h計算
+
+就寝25:30／起床07:00 → 翌日補正で5.5h
+
+タスク完了→感情選択→保存→再起動後も残存
+
+週/月タブ切替で選択状態が保持
+
+11. 今後のUI追加候補
+
+チュートリアル（初回起動）
+
+ウィジェット（本日のスコア／寝る前タスク）
+
+高コントラストテーマ
