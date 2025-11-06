@@ -30,75 +30,31 @@ let webDB: {
 };
 
 /**
- * Helper: execAsync互換のPromiseラッパー（Legacy API用）
+ * Helper: execAsync for SDK 54+ (直接使用)
  */
-function execAsync(database: SQLite.SQLiteDatabase, sqlStatement: string): Promise<void> {
-  return new Promise((resolve, reject) => {
-    database.exec([{ sql: sqlStatement, args: [] }], false, (error) => {
-      if (error) {
-        reject(error);
-      } else {
-        resolve();
-      }
-    });
-  });
+async function execAsync(database: SQLite.SQLiteDatabase, sqlStatement: string): Promise<void> {
+  await database.execAsync(sqlStatement);
 }
 
 /**
- * Helper: runAsync互換のPromiseラッパー（Legacy API用）
+ * Helper: runAsync for SDK 54+ (直接使用)
  */
-function runAsync(database: SQLite.SQLiteDatabase, sql: string, params: any[]): Promise<void> {
-  return new Promise((resolve, reject) => {
-    database.transaction((tx) => {
-      tx.executeSql(
-        sql,
-        params,
-        () => resolve(),
-        (_, error) => {
-          reject(error);
-          return false;
-        }
-      );
-    });
-  });
+async function runAsync(database: SQLite.SQLiteDatabase, sql: string, params: any[]): Promise<void> {
+  await database.runAsync(sql, params);
 }
 
 /**
- * Helper: getAllAsync互換のPromiseラッパー（Legacy API用）
+ * Helper: getAllAsync for SDK 54+ (直接使用)
  */
-function getAllAsync<T>(database: SQLite.SQLiteDatabase, sql: string, params: any[] = []): Promise<T[]> {
-  return new Promise((resolve, reject) => {
-    database.transaction((tx) => {
-      tx.executeSql(
-        sql,
-        params,
-        (_, { rows }) => resolve(rows._array as T[]),
-        (_, error) => {
-          reject(error);
-          return false;
-        }
-      );
-    });
-  });
+async function getAllAsync<T>(database: SQLite.SQLiteDatabase, sql: string, params: any[] = []): Promise<T[]> {
+  return await database.getAllAsync<T>(sql, params);
 }
 
 /**
- * Helper: getFirstAsync互換のPromiseラッパー（Legacy API用）
+ * Helper: getFirstAsync for SDK 54+ (直接使用)
  */
-function getFirstAsync<T>(database: SQLite.SQLiteDatabase, sql: string, params: any[] = []): Promise<T | null> {
-  return new Promise((resolve, reject) => {
-    database.transaction((tx) => {
-      tx.executeSql(
-        sql,
-        params,
-        (_, { rows }) => resolve(rows.length > 0 ? (rows._array[0] as T) : null),
-        (_, error) => {
-          reject(error);
-          return false;
-        }
-      );
-    });
-  });
+async function getFirstAsync<T>(database: SQLite.SQLiteDatabase, sql: string, params: any[] = []): Promise<T | null> {
+  return await database.getFirstAsync<T>(sql, params);
 }
 
 /**
@@ -124,8 +80,8 @@ export async function openDatabase(): Promise<SQLite.SQLiteDatabase | null> {
   console.log('📦 Opening database...');
 
   try {
-    // expo-sqlite の従来の API を使用（Native のみ）
-    db = SQLite.openDatabase('mindful_rhythm.db');
+    // expo-sqlite 15.0.0 の新しい API を使用（SDK 54対応）
+    db = await SQLite.openDatabaseAsync('mindful_rhythm.db');
     await initializeDatabase();
     console.log('✅ Database opened successfully');
   } catch (error) {
@@ -210,8 +166,8 @@ async function initializeDatabase(): Promise<void> {
     CREATE TABLE IF NOT EXISTS tasks (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       date TEXT NOT NULL,                     -- YYYY-MM-DD
-      task TEXT NOT NULL CHECK (length(task) >= 1 AND length(task) <= 200),
-      status TEXT CHECK (status IN ('todo', 'done')) DEFAULT 'todo',
+      title TEXT NOT NULL CHECK (length(title) >= 1 AND length(title) <= 200),
+      status TEXT CHECK (status IN ('pending', 'done')) DEFAULT 'pending',
       emotion TEXT,                           -- 絵文字（😊 😌 😫 😡 😭 😴）
       is_daily_mission BOOLEAN DEFAULT 0,     -- 睡眠改善課題フラグ
       created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
@@ -470,26 +426,35 @@ export async function updateSleepRecord(date: string, updates: Partial<SleepReco
 // ========================================
 
 /**
- * タスクを追加
+ * タスクを追加 ✨ v0.2更新: deadline, difficulty対応
  *
  * @example
  * await addTask('買い物に行く');
- * await addTask('レポート提出', true); // 睡眠改善課題として追加
+ * await addTask('レポート提出', { deadline: '2025-11-15', difficulty: 4 });
  */
-export async function addTask(taskText: string, isDailyMission: boolean = false): Promise<void> {
+export async function addTask(
+  taskText: string,
+  options?: {
+    deadline?: string | null;
+    difficulty?: number | null;
+  }
+): Promise<void> {
   const today = new Date().toISOString().split('T')[0];
+  const deadline = options?.deadline || null;
+  const difficulty = options?.difficulty || 3; // デフォルト: 普通
 
   if (isWeb) {
     // Web用実装
-    const newTask = {
+    const newTask: any = {
       id: webDB.tasks.length + 1,
       date: today,
-      task: taskText,
-      status: 'todo',
+      title: taskText,
+      status: 'pending',
       emotion: null,
-      is_daily_mission: isDailyMission,
-      created_at: Date.now(),
-      updated_at: Date.now(),
+      deadline,
+      difficulty,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
     };
     webDB.tasks.push(newTask);
     console.log(`✅ Task added: ${taskText}`);
@@ -500,10 +465,10 @@ export async function addTask(taskText: string, isDailyMission: boolean = false)
   try {
     await runAsync(
       database!,
-      'INSERT INTO tasks (date, task, status, is_daily_mission) VALUES (?, ?, ?, ?)',
-      [today, taskText, 'todo', isDailyMission ? 1 : 0]
+      'INSERT INTO tasks (date, title, status, deadline, difficulty) VALUES (?, ?, ?, ?, ?)',
+      [today, taskText, 'pending', deadline, difficulty]
     );
-    console.log(`✅ Task added: ${taskText}`);
+    console.log(`✅ Task added: ${taskText} (deadline: ${deadline}, difficulty: ${difficulty})`);
   } catch (error) {
     console.error('❌ Error adding task:', error);
     throw error;
@@ -541,7 +506,7 @@ export async function getTasksByDate(date: string): Promise<Task[]> {
  */
 export async function updateTaskStatus(
   taskId: number,
-  status: 'todo' | 'done',
+  status: 'pending' | 'done',
   emotion?: string
 ): Promise<void> {
   if (isWeb) {
@@ -550,7 +515,7 @@ export async function updateTaskStatus(
     if (task) {
       task.status = status;
       task.emotion = emotion ?? null;
-      task.updated_at = Date.now();
+      task.updated_at = new Date().toISOString();
     }
     console.log(`✅ Task ${taskId} updated to ${status}`);
     return;
@@ -656,6 +621,70 @@ export async function getAllMissions(): Promise<DailyMission[]> {
   const results = await getAllAsync<DailyMission>(
     database!,
     'SELECT * FROM daily_missions ORDER BY category, id'
+  );
+
+  return results;
+}
+
+// ========================================
+// ホーム画面用のデータ取得関数
+// ========================================
+
+/**
+ * 最新の睡眠記録を取得（ホーム画面用）
+ *
+ * @returns 最新の睡眠記録、なければnull
+ */
+export async function getLatestSleepRecord(): Promise<SleepRecord | null> {
+  if (isWeb) {
+    // Web用実装
+    if (webDB.sleep_records.length === 0) return null;
+
+    const sorted = [...webDB.sleep_records].sort((a, b) => {
+      return new Date(b.date).getTime() - new Date(a.date).getTime();
+    });
+
+    return sorted[0];
+  }
+
+  const database = await openDatabase();
+  const result = await getFirstAsync<SleepRecord>(
+    database!,
+    `SELECT * FROM sleep_records
+     ORDER BY date DESC, created_at DESC
+     LIMIT 1`
+  );
+
+  return result ?? null;
+}
+
+/**
+ * 今日のタスクを取得（ホーム画面用）
+ *
+ * @returns 今日のタスク一覧
+ */
+export async function getTodayTasks(): Promise<Task[]> {
+  const today = new Date().toISOString().split('T')[0];
+
+  if (isWeb) {
+    // Web用実装
+    return webDB.tasks
+      .filter(task => task.date === today)
+      .sort((a, b) => {
+        if (a.status === b.status) return a.id - b.id;
+        return a.status === 'done' ? 1 : -1;
+      });
+  }
+
+  const database = await openDatabase();
+  const results = await getAllAsync<Task>(
+    database!,
+    `SELECT * FROM tasks
+     WHERE date = ?
+     ORDER BY
+       CASE WHEN status = 'done' THEN 1 ELSE 0 END,
+       created_at ASC`,
+    [today]
   );
 
   return results;

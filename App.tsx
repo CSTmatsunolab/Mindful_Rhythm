@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import AppNavigator from './src/navigation/AppNavigator';
 import { openDatabase } from './src/services/database';
+import { migrateDatabase } from './scripts/migrateDatabase_v0.2';
 
 /**
  * Mindful Rhythm - メインアプリエントリーポイント
@@ -10,14 +11,20 @@ import { openDatabase } from './src/services/database';
  * CBT-I（認知行動療法）理論に基づく睡眠スコアアルゴリズム
  */
 export default function App() {
-  // データベース初期化（アプリ起動時に1回だけ実行）
+  // データベース初期化とマイグレーション（アプリ起動時に1回だけ実行）
   useEffect(() => {
     const initDatabase = async () => {
       try {
         await openDatabase();
-        console.log('✅ App initialized with database');
+        console.log('✅ Database opened');
+
+        // v0.2 マイグレーション実行
+        await migrateDatabase();
+        console.log('✅ Database migration v0.2 completed');
+
+        console.log('✅ App initialized successfully');
       } catch (error) {
-        console.error('❌ Failed to initialize database:', error);
+        console.error('❌ Failed to initialize app:', error);
       }
     };
 

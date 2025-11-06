@@ -1,8 +1,11 @@
-import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { Colors } from '../constants/Colors';
 import { Typography } from '../constants/Typography';
 import { HomeScreenNavigationProp } from '../types/navigation';
+import { getLatestSleepRecord, getTodayTasks } from '../services/database';
+import type { SleepRecord, Task } from '../types/database';
 
 interface Props {
   navigation: HomeScreenNavigationProp;
@@ -10,19 +13,110 @@ interface Props {
 
 /**
  * ホーム画面
- * - 睡眠スコア表示（円形ゲージ）
+ * - 睡眠スコア表示（円形ゲージ）✅ DB連携済み
  * - 今日の気分
- * - キャラクター「スリーピン」
- * - 今日のタスク一覧
+ * - キャラクター「スリーピン」✅ スコアに応じた表情変化
+ * - 今日のタスク一覧 ✅ DB連携済み
  */
 export default function HomeScreen({ navigation }: Props) {
-  // TODO: データベースから最新の睡眠スコアを取得
-  const sleepScore = 82; // モック値
+  const [sleepRecord, setSleepRecord] = useState<SleepRecord | null>(null);
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [loading, setLoading] = useState(true);
+
   const todayDate = new Date().toLocaleDateString('ja-JP', {
     month: 'long',
     day: 'numeric',
     weekday: 'short',
   });
+
+  /**
+   * データを取得する関数
+   */
+  const loadData = async () => {
+    try {
+      setLoading(true);
+
+      // 最新の睡眠記録を取得
+      const latestSleep = await getLatestSleepRecord();
+      setSleepRecord(latestSleep);
+
+      // 今日のタスクを取得
+      const todayTasks = await getTodayTasks();
+      setTasks(todayTasks);
+    } catch (error) {
+      console.error('❌ Failed to load home screen data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  /**
+   * 初回マウント時にデータを取得
+   */
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  /**
+   * 画面にフォーカスが当たるたびにデータを再取得
+   * （他の画面でデータが更新された場合に反映）
+   */
+  useFocusEffect(
+    React.useCallback(() => {
+      loadData();
+    }, [])
+  );
+
+  /**
+   * 睡眠スコアに基づいてキャラクターの表情を決定
+   */
+  const getCharacterEmoji = (): string => {
+    if (!sleepRecord) return '😴'; // データなし
+
+    const score = sleepRecord.score;
+    if (score >= 90) return '😊'; // 優秀
+    if (score >= 80) return '🙂'; // 良好
+    if (score >= 70) return '😐'; // 普通
+    if (score >= 60) return '😟'; // やや低い
+    return '😫'; // 要改善
+  };
+
+  /**
+   * 睡眠スコアに基づいてラベルを決定
+   */
+  const getScoreLabel = (): string => {
+    if (!sleepRecord) return 'データがありません';
+
+    const score = sleepRecord.score;
+    if (score >= 90) return 'とても良い睡眠です！';
+    if (score >= 80) return '良好な睡眠です';
+    if (score >= 70) return 'まずまずの睡眠です';
+    if (score >= 60) return '睡眠を改善しましょう';
+    return '睡眠の質を見直しましょう';
+  };
+
+  /**
+   * タスクの完了進捗を計算
+   */
+  const getTaskProgress = () => {
+    if (tasks.length === 0) return { completed: 0, total: 0 };
+
+    const completed = tasks.filter(task => task.status === 'done').length;
+    return { completed, total: tasks.length };
+  };
+
+  const sleepScore = sleepRecord?.score || 0;
+  const { completed, total } = getTaskProgress();
+
+  // ローディング中の表示
+  if (loading) {
+    return (
+      <View style={[styles.container, styles.centered]}>
+        <ActivityIndicator size="large" color={Colors.accent} />
+        <Text style={styles.loadingText}>データを読み込み中...</Text>
+      </View>
+    );
+  }
 
   return (
     <ScrollView style={styles.container}>
@@ -35,8 +129,11 @@ export default function HomeScreen({ navigation }: Props) {
       {/* Character Section */}
       <View style={styles.characterSection}>
         <View style={styles.characterContainer}>
-          <Text style={styles.characterEmoji}>😊</Text>
+          <Text style={styles.characterEmoji}>{getCharacterEmoji()}</Text>
           <Text style={styles.characterName}>スリーピン</Text>
+          {sleepRecord && (
+            <Text style={styles.characterScore}>睡眠スコア: {sleepScore}点</Text>
+          )}
         </View>
       </View>
 
@@ -46,47 +143,69 @@ export default function HomeScreen({ navigation }: Props) {
         onPress={() => navigation.navigate('SleepTracker')}
         accessibilityLabel="睡眠スコアカード。タップして睡眠記録画面へ"
       >
-        <Text style={styles.scoreTitle}>今日の睡眠スコア</Text>
-        <View style={styles.scoreCircle}>
-          <Text style={styles.scoreValue}>{sleepScore}</Text>
-          <Text style={styles.scoreUnit}>点</Text>
-        </View>
-        <View style={styles.scoreBar}>
-          {[...Array(7)].map((_, i) => (
-            <View
-              key={i}
-              style={[
-                styles.scoreBarItem,
-                { backgroundColor: i < 5 ? Colors.accent : Colors.border },
-              ]}
-            />
-          ))}
-        </View>
-        <Text style={styles.scoreLabel}>とても良い睡眠です！</Text>
+        <Text style={styles.scoreTitle}>昨日の睡眠スコア</Text>
+        {sleepRecord ? (
+          <>
+            <View style={styles.scoreCircle}>
+              <Text style={styles.scoreValue}>{sleepScore}</Text>
+              <Text style={styles.scoreUnit}>点</Text>
+            </View>
+            <View style={styles.scoreBar}>
+              {[...Array(7)].map((_, i) => (
+                <View
+                  key={i}
+                  style={[
+                    styles.scoreBarItem,
+                    { backgroundColor: i < Math.floor((sleepScore / 100) * 7) ? Colors.accent : Colors.border },
+                  ]}
+                />
+              ))}
+            </View>
+            <Text style={styles.scoreLabel}>{getScoreLabel()}</Text>
+            <Text style={styles.scoreDetail}>
+              睡眠時間: {sleepRecord.total_hours.toFixed(1)}時間
+            </Text>
+          </>
+        ) : (
+          <Text style={styles.noDataText}>まだ睡眠記録がありません{'\n'}記録を追加しましょう</Text>
+        )}
       </TouchableOpacity>
 
       {/* Today's Tasks Section */}
       <View style={styles.tasksSection}>
         <View style={styles.tasksSectionHeader}>
           <Text style={styles.tasksTitle}>今日のタスク</Text>
-          <Text style={styles.tasksProgress}>2/5 完了</Text>
+          <Text style={styles.tasksProgress}>{completed}/{total} 完了</Text>
         </View>
 
         {/* Task Items */}
-        <View style={styles.taskItem}>
-          <View style={styles.taskCheckbox}>
-            <Text style={styles.taskCheckMark}>✓</Text>
-          </View>
-          <Text style={[styles.taskText, styles.taskTextCompleted]}>
-            寝る1時間前はスマホ禁止
-          </Text>
-          <Text style={styles.taskEmoji}>😌</Text>
-        </View>
-
-        <View style={styles.taskItem}>
-          <View style={[styles.taskCheckbox, styles.taskCheckboxEmpty]} />
-          <Text style={styles.taskText}>15時以降カフェイン禁止</Text>
-        </View>
+        {tasks.length > 0 ? (
+          <>
+            {tasks.slice(0, 3).map((task) => (
+              <View key={task.id} style={styles.taskItem}>
+                <View style={[
+                  styles.taskCheckbox,
+                  task.status === 'done' ? {} : styles.taskCheckboxEmpty
+                ]}>
+                  {task.status === 'done' && (
+                    <Text style={styles.taskCheckMark}>✓</Text>
+                  )}
+                </View>
+                <Text style={[
+                  styles.taskText,
+                  task.status === 'done' && styles.taskTextCompleted
+                ]}>
+                  {task.title}
+                </Text>
+                {task.emotion && (
+                  <Text style={styles.taskEmoji}>{task.emotion}</Text>
+                )}
+              </View>
+            ))}
+          </>
+        ) : (
+          <Text style={styles.noDataText}>今日のタスクはまだありません</Text>
+        )}
 
         <TouchableOpacity
           style={styles.viewAllButton}
@@ -123,6 +242,21 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: Colors.background,
   },
+  centered: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    ...Typography.body,
+    color: Colors.textSecondary,
+    marginTop: 12,
+  },
+  noDataText: {
+    ...Typography.body,
+    color: Colors.textSecondary,
+    textAlign: 'center',
+    padding: 20,
+  },
   header: {
     padding: 20,
     paddingTop: 60,
@@ -150,6 +284,11 @@ const styles = StyleSheet.create({
   characterName: {
     ...Typography.caption,
     color: Colors.textSecondary,
+  },
+  characterScore: {
+    ...Typography.caption,
+    color: Colors.accent,
+    marginTop: 4,
   },
   scoreCard: {
     backgroundColor: Colors.surface,
@@ -196,6 +335,11 @@ const styles = StyleSheet.create({
   scoreLabel: {
     ...Typography.body,
     color: Colors.success,
+  },
+  scoreDetail: {
+    ...Typography.caption,
+    color: Colors.textSecondary,
+    marginTop: 8,
   },
   tasksSection: {
     marginHorizontal: 20,

@@ -22,13 +22,14 @@ export interface SleepRecord {
 
 export interface Task {
   id: number;
+  title: string;                   // タスク名
   date: string;                    // YYYY-MM-DD
-  task: string;
-  status: 'todo' | 'done';
-  emotion?: string;                // 絵文字
-  is_daily_mission: boolean;       // 睡眠改善課題フラグ
-  created_at: number;
-  updated_at: number;
+  status: 'pending' | 'done';      // ステータス
+  emotion?: string | null;         // 絵文字
+  deadline?: string | null;        // 締め切り日（YYYY-MM-DD）✨ v0.2追加
+  difficulty?: number | null;      // 難易度（1-5）✨ v0.2追加
+  created_at: string;              // ISO timestamp
+  updated_at: string;              // ISO timestamp
 }
 
 export interface UserMood {

@@ -2,6 +2,7 @@
  * 睡眠記録画面
  *
  * 機能:
+ * - 任意日付での記録（過去7日間） ✨ v0.2追加
  * - 就寝・起床時間入力
  * - 睡眠の質選択（よく眠れた/普通/浅かった）
  * - 中途覚醒回数・入眠潜時入力
@@ -9,7 +10,7 @@
  * - 睡眠スコア自動計算・保存
  *
  * 担当: 増田さん
- * Week: 3-4
+ * Week: 3-4, 4 (v0.2)
  */
 
 import React, { useState } from 'react';
@@ -49,6 +50,10 @@ export default function SleepTrackerScreen() {
   // State管理
   // ========================================
 
+  // 記録日付（デフォルトは今日） ✨ v0.2追加
+  const [recordDate, setRecordDate] = useState(new Date());
+  const [showDatePicker, setShowDatePicker] = useState(false);
+
   // 就寝時間（デフォルト22:00）
   const [bedtime, setBedtime] = useState(new Date(2025, 9, 30, 22, 0));
   const [showBedtimePicker, setShowBedtimePicker] = useState(false);
@@ -75,6 +80,32 @@ export default function SleepTrackerScreen() {
   // ========================================
   // イベントハンドラ
   // ========================================
+
+  /**
+   * 記録日付変更 ✨ v0.2追加
+   * 過去7日間のみ選択可能
+   */
+  const handleDateChange = (event: any, selectedDate?: Date) => {
+    setShowDatePicker(Platform.OS === 'ios');
+    if (selectedDate) {
+      // 過去7日間かチェック
+      const today = new Date();
+      const sevenDaysAgo = new Date(today);
+      sevenDaysAgo.setDate(today.getDate() - 7);
+
+      if (selectedDate > today) {
+        Alert.alert('エラー', '未来の日付は選択できません');
+        return;
+      }
+
+      if (selectedDate < sevenDaysAgo) {
+        Alert.alert('エラー', '過去7日間の日付のみ選択可能です');
+        return;
+      }
+
+      setRecordDate(selectedDate);
+    }
+  };
 
   /**
    * 就寝時間変更
@@ -138,9 +169,12 @@ export default function SleepTrackerScreen() {
         tags: selectedTags,
       });
 
+      // 選択した日付をYYYY-MM-DD形式に変換 ✨ v0.2更新
+      const recordDateStr = recordDate.toISOString().split('T')[0];
+
       // データベースに保存
       await saveSleepRecord({
-        date: getToday(),
+        date: recordDateStr,
         bedtime: formatTime(bedtime),
         waketime: formatTime(waketime),
         total_hours: scoreResult.totalHours,
@@ -171,12 +205,48 @@ export default function SleepTrackerScreen() {
   // レンダリング
   // ========================================
 
+  // 選択した日付を日本語形式で表示
+  const formatRecordDate = (date: Date) => {
+    return date.toLocaleDateString('ja-JP', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      weekday: 'short',
+    });
+  };
+
   return (
     <ScrollView style={styles.container}>
       <View style={styles.content}>
         {/* ヘッダー */}
         <Text style={styles.title}>睡眠記録</Text>
-        <Text style={styles.subtitle}>{getToday()}</Text>
+        <Text style={styles.subtitle}>記録を追加</Text>
+
+        {/* 記録日付選択 ✨ v0.2追加 */}
+        <View style={styles.section}>
+          <Text style={styles.label}>📅 記録日を選択</Text>
+          <TouchableOpacity
+            style={styles.dateButton}
+            onPress={() => setShowDatePicker(true)}
+          >
+            <Text style={styles.dateText}>{formatRecordDate(recordDate)}</Text>
+          </TouchableOpacity>
+          <Text style={styles.helperText}>※ 過去7日間の日付を選択できます</Text>
+          {showDatePicker && (
+            <DateTimePicker
+              value={recordDate}
+              mode="date"
+              display="default"
+              onChange={handleDateChange}
+              maximumDate={new Date()}
+              minimumDate={(() => {
+                const sevenDaysAgo = new Date();
+                sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+                return sevenDaysAgo;
+              })()}
+            />
+          )}
+        </View>
 
         {/* 就寝時間 */}
         <View style={styles.section}>
@@ -348,6 +418,23 @@ const styles = StyleSheet.create({
     ...Typography.h3,
     color: Colors.text,
     marginBottom: 12,
+  },
+  dateButton: {
+    backgroundColor: Colors.surface,
+    padding: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: Colors.accent,
+  },
+  dateText: {
+    ...Typography.h3,
+    color: Colors.accent,
+  },
+  helperText: {
+    ...Typography.caption,
+    color: Colors.textSecondary,
+    marginTop: 8,
   },
   timeButton: {
     backgroundColor: Colors.surface,
