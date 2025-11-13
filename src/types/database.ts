@@ -16,6 +16,12 @@ export interface SleepRecord {
   tags?: string[];                 // 環境タグ（JSONパース後）
   dream?: string;                  // 夢の記録
   mood?: string;                   // 絵文字
+  recording_start_time?: number;   // 記録開始時刻（UNIX timestamp）
+  recording_end_time?: number;     // 記録終了時刻（UNIX timestamp）
+  recording_status?: 'idle' | 'recording' | 'completed';
+  snoring_count?: number;          // いびき検出回数
+  snoring_duration_minutes?: number; // いびき総時間（分）
+  snoring_average_volume?: number; // いびき平均音量（dB）
   created_at: number;              // UNIX timestamp
   updated_at: number;              // UNIX timestamp
 }
@@ -53,6 +59,33 @@ export interface DailyMission {
   id: number;
   mission_text: string;
   category: 'sleep_hygiene' | 'exercise' | 'relaxation' | 'environment';
+}
+
+/**
+ * アラーム設定
+ */
+export interface Alarm {
+  id: number;
+  alarm_time: string;              // HH:MM
+  enabled: boolean;                // 有効/無効
+  repeat_days?: string[];          // ["mon","tue","wed",...] JSONパース後
+  label?: string;                  // アラームラベル
+  sound?: string;                  // 音源ファイル名
+  snooze_enabled?: boolean;        // スヌーズ有効
+  snooze_minutes?: number;         // スヌーズ時間（分）
+  smart_wakeup?: boolean;          // スマートウェイクアップ
+  notification_id?: string;        // expo-notifications の通知ID
+  created_at: number;              // UNIX timestamp
+  updated_at: number;              // UNIX timestamp
+}
+
+/**
+ * いびきイベント詳細（オプション）
+ */
+export interface SnoringEvent {
+  timestamp: number;               // いびき発生時刻（UNIX timestamp）
+  duration: number;                // 継続時間（ミリ秒）
+  peakVolume: number;              // ピーク音量（dBFS）
 }
 
 /**

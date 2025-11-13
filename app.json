@@ -14,16 +14,38 @@
     "assetBundlePatterns": [
       "**/*"
     ],
+    "plugins": [
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/notification-icon.png",
+          "color": "#6366F1",
+          "sounds": []
+        }
+      ]
+    ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.mindfulrhythm.app"
+      "bundleIdentifier": "com.mindfulrhythm.app",
+      "infoPlist": {
+        "NSMicrophoneUsageDescription": "このアプリは睡眠中のいびきを検出するためにマイクを使用します",
+        "UIBackgroundModes": ["audio"]
+      }
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#0F172A"
       },
-      "package": "com.mindfulrhythm.app"
+      "package": "com.mindfulrhythm.app",
+      "permissions": [
+        "RECORD_AUDIO",
+        "RECEIVE_BOOT_COMPLETED",
+        "SCHEDULE_EXACT_ALARM",
+        "USE_EXACT_ALARM",
+        "WAKE_LOCK",
+        "FOREGROUND_SERVICE"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"

@@ -25,11 +25,13 @@ import {
   Platform,
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import { useNavigation } from '@react-navigation/native';
 import { Colors } from '../constants/Colors';
 import { Typography } from '../constants/Typography';
 import { getToday, formatTime } from '../utils/dateFormatter';
 import { calculateSleepScore } from '../services/sleepScoreCalculator';
 import { saveSleepRecord } from '../services/database';
+import type { SleepTrackerNavigationProp } from '../types/navigation';
 
 /**
  * 睡眠環境タグ一覧
@@ -46,6 +48,11 @@ const ENVIRONMENT_TAGS = [
 ];
 
 export default function SleepTrackerScreen() {
+  // ========================================
+  // Navigation
+  // ========================================
+  const navigation = useNavigation<SleepTrackerNavigationProp>();
+
   // ========================================
   // State管理
   // ========================================
@@ -221,6 +228,42 @@ export default function SleepTrackerScreen() {
         {/* ヘッダー */}
         <Text style={styles.title}>睡眠記録</Text>
         <Text style={styles.subtitle}>記録を追加</Text>
+
+        {/* リアルタイム記録ボタン */}
+        <TouchableOpacity
+          style={styles.realtimeButton}
+          onPress={() => navigation.navigate('SleepRecording')}
+        >
+          <Text style={styles.realtimeButtonEmoji}>🎤</Text>
+          <View style={styles.realtimeButtonTextContainer}>
+            <Text style={styles.realtimeButtonTitle}>リアルタイム睡眠記録</Text>
+            <Text style={styles.realtimeButtonSubtitle}>
+              いびき検出付き・自動記録
+            </Text>
+          </View>
+          <Text style={styles.realtimeButtonArrow}>→</Text>
+        </TouchableOpacity>
+
+        {/* アラーム設定ボタン */}
+        <TouchableOpacity
+          style={styles.alarmButton}
+          onPress={() => navigation.navigate('AlarmSetting')}
+        >
+          <Text style={styles.alarmButtonEmoji}>⏰</Text>
+          <View style={styles.alarmButtonTextContainer}>
+            <Text style={styles.alarmButtonTitle}>アラーム設定</Text>
+            <Text style={styles.alarmButtonSubtitle}>
+              起床時間を設定
+            </Text>
+          </View>
+          <Text style={styles.alarmButtonArrow}>→</Text>
+        </TouchableOpacity>
+
+        <View style={styles.divider}>
+          <View style={styles.dividerLine} />
+          <Text style={styles.dividerText}>手動で記録を入力</Text>
+          <View style={styles.dividerLine} />
+        </View>
 
         {/* 記録日付選択 ✨ v0.2追加 */}
         <View style={styles.section}>
@@ -521,5 +564,96 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     textAlign: 'center',
     marginTop: 16,
+  },
+
+  // リアルタイム記録ボタン
+  realtimeButton: {
+    backgroundColor: Colors.primary,
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  realtimeButtonEmoji: {
+    fontSize: 40,
+    marginRight: 16,
+  },
+  realtimeButtonTextContainer: {
+    flex: 1,
+  },
+  realtimeButtonTitle: {
+    ...Typography.h3,
+    color: Colors.text,
+    fontWeight: 'bold',
+    marginBottom: 4,
+  },
+  realtimeButtonSubtitle: {
+    ...Typography.caption,
+    color: Colors.textSecondary,
+  },
+  realtimeButtonArrow: {
+    fontSize: 24,
+    color: Colors.accent,
+    fontWeight: 'bold',
+  },
+
+  // アラーム設定ボタン
+  alarmButton: {
+    backgroundColor: Colors.surface,
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 24,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: Colors.accent,
+  },
+  alarmButtonEmoji: {
+    fontSize: 40,
+    marginRight: 16,
+  },
+  alarmButtonTextContainer: {
+    flex: 1,
+  },
+  alarmButtonTitle: {
+    ...Typography.h3,
+    color: Colors.text,
+    fontWeight: 'bold',
+    marginBottom: 4,
+  },
+  alarmButtonSubtitle: {
+    ...Typography.caption,
+    color: Colors.textSecondary,
+  },
+  alarmButtonArrow: {
+    fontSize: 24,
+    color: Colors.accent,
+    fontWeight: 'bold',
+  },
+
+  // 区切り線
+  divider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: Colors.border,
+  },
+  dividerText: {
+    ...Typography.caption,
+    color: Colors.textSecondary,
+    marginHorizontal: 12,
   },
 });

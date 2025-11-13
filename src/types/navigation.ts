@@ -26,6 +26,8 @@ export type RootStackParamList = {
   Auth: undefined;
   MainTabs: undefined;
   SleepDiary: undefined;
+  SleepRecording: undefined;
+  AlarmSetting: undefined;
 };
 
 /**

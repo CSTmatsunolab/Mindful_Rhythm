@@ -3,6 +3,8 @@ import { StatusBar } from 'expo-status-bar';
 import AppNavigator from './src/navigation/AppNavigator';
 import { openDatabase } from './src/services/database';
 import { migrateDatabase } from './scripts/migrateDatabase_v0.2';
+import { SleepRecordingProvider } from './src/contexts/SleepRecordingContext';
+import { initializeNotifications, requestNotificationPermissions } from './src/services/notificationService';
 
 /**
  * Mindful Rhythm - メインアプリエントリーポイント
@@ -11,10 +13,11 @@ import { migrateDatabase } from './scripts/migrateDatabase_v0.2';
  * CBT-I（認知行動療法）理論に基づく睡眠スコアアルゴリズム
  */
 export default function App() {
-  // データベース初期化とマイグレーション（アプリ起動時に1回だけ実行）
+  // データベース・通知初期化（アプリ起動時に1回だけ実行）
   useEffect(() => {
-    const initDatabase = async () => {
+    const initApp = async () => {
       try {
+        // データベース初期化
         await openDatabase();
         console.log('✅ Database opened');
 
@@ -22,19 +25,29 @@ export default function App() {
         await migrateDatabase();
         console.log('✅ Database migration v0.2 completed');
 
+        // 通知システム初期化
+        await initializeNotifications();
+        console.log('✅ Notifications initialized');
+
+        // 通知権限リクエスト
+        const hasPermission = await requestNotificationPermissions();
+        if (!hasPermission) {
+          console.warn('⚠️ Notification permissions not granted');
+        }
+
         console.log('✅ App initialized successfully');
       } catch (error) {
         console.error('❌ Failed to initialize app:', error);
       }
     };
 
-    initDatabase();
+    initApp();
   }, []);
 
   return (
-    <>
+    <SleepRecordingProvider>
       <AppNavigator />
       <StatusBar style="light" />
-    </>
+    </SleepRecordingProvider>
   );
 }

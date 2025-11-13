@@ -9,7 +9,7 @@
 
 import * as SQLite from 'expo-sqlite';
 import { Platform } from 'react-native';
-import { SleepRecord, Task, DailyMission } from '../types/database';
+import { SleepRecord, Task, DailyMission, Alarm } from '../types/database';
 
 let db: SQLite.SQLiteDatabase | null = null;
 const isWeb = Platform.OS === 'web';
@@ -21,12 +21,14 @@ let webDB: {
   user_mood: any[];
   ai_advice: any[];
   daily_missions: any[];
+  alarms: any[];
 } = {
   sleep_records: [],
   tasks: [],
   user_mood: [],
   ai_advice: [],
   daily_missions: [],
+  alarms: [],
 };
 
 /**
@@ -39,8 +41,8 @@ async function execAsync(database: SQLite.SQLiteDatabase, sqlStatement: string):
 /**
  * Helper: runAsync for SDK 54+ (直接使用)
  */
-async function runAsync(database: SQLite.SQLiteDatabase, sql: string, params: any[]): Promise<void> {
-  await database.runAsync(sql, params);
+async function runAsync(database: SQLite.SQLiteDatabase, sql: string, params: any[]): Promise<SQLite.SQLiteRunResult> {
+  return await database.runAsync(sql, params);
 }
 
 /**
@@ -146,6 +148,12 @@ async function initializeDatabase(): Promise<void> {
       tags TEXT,                              -- JSON配列 ["運動", "入浴"]
       dream TEXT,                             -- 見た夢（睡眠日記用）
       mood TEXT,                              -- 今日の気分（睡眠日記用）
+      recording_start_time INTEGER,           -- 記録開始時刻（UNIX timestamp）
+      recording_end_time INTEGER,             -- 記録終了時刻（UNIX timestamp）
+      recording_status TEXT CHECK (recording_status IN ('idle', 'recording', 'completed')),
+      snoring_count INTEGER DEFAULT 0,        -- いびき検出回数
+      snoring_duration_minutes REAL DEFAULT 0, -- いびき総時間（分）
+      snoring_average_volume REAL DEFAULT 0,  -- いびき平均音量（dB）
       created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
       updated_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now'))
     );
@@ -226,24 +234,48 @@ async function initializeDatabase(): Promise<void> {
     );
   `);
 
-  // 初期データ投入（初回のみ）
-  const count = await getFirstAsync<{count: number}>(db, 'SELECT COUNT(*) as count FROM daily_missions');
-  if (count?.count === 0) {
-    console.log('📝 Inserting initial daily missions...');
-    await execAsync(db, `
-      INSERT INTO daily_missions (mission_text, category) VALUES
-      ('寝る1時間前はスマホ・PC禁止', 'sleep_hygiene'),
-      ('カフェインは15時以降摂取しない', 'sleep_hygiene'),
-      ('就寝2時間前に軽い運動（ストレッチ・散歩）', 'exercise'),
-      ('寝室の温度を18～22℃に保つ', 'environment'),
-      ('就寝前に入浴（38～40℃、15分）', 'relaxation'),
-      ('毎日同じ時刻に就寝・起床する', 'sleep_hygiene'),
-      ('昼寝は15分以内、15時前に済ませる', 'sleep_hygiene'),
-      ('寝室を暗く静かに保つ（遮光カーテン・耳栓）', 'environment'),
-      ('就寝前にリラクゼーション（深呼吸・瞑想）', 'relaxation'),
-      ('寝る前にアルコール・タバコを避ける', 'sleep_hygiene');
-    `);
-  }
+  // 初期データ投入（INSERT OR IGNORE で重複を防止）
+  console.log('📝 Inserting initial daily missions (if not exists)...');
+  await execAsync(db, `
+    INSERT OR IGNORE INTO daily_missions (mission_text, category) VALUES
+    ('寝る1時間前はスマホ・PC禁止', 'sleep_hygiene'),
+    ('カフェインは15時以降摂取しない', 'sleep_hygiene'),
+    ('就寝2時間前に軽い運動（ストレッチ・散歩）', 'exercise'),
+    ('寝室の温度を18～22℃に保つ', 'environment'),
+    ('就寝前に入浴（38～40℃、15分）', 'relaxation'),
+    ('毎日同じ時刻に就寝・起床する', 'sleep_hygiene'),
+    ('昼寝は15分以内、15時前に済ませる', 'sleep_hygiene'),
+    ('寝室を暗く静かに保つ（遮光カーテン・耳栓）', 'environment'),
+    ('就寝前にリラクゼーション（深呼吸・瞑想）', 'relaxation'),
+    ('寝る前にアルコール・タバコを避ける', 'sleep_hygiene');
+  `);
+
+  // ========================================
+  // 6. alarms テーブル（アラーム設定）
+  // ========================================
+  await execAsync(db, `
+    CREATE TABLE IF NOT EXISTS alarms (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      alarm_time TEXT NOT NULL,               -- HH:MM
+      enabled BOOLEAN DEFAULT 1,              -- 有効/無効
+      repeat_days TEXT,                       -- JSON配列 ["mon","tue","wed",...]
+      label TEXT,                             -- ラベル（例: "平日の起床"）
+      sound TEXT DEFAULT 'default',           -- 音源ファイル名
+      snooze_enabled BOOLEAN DEFAULT 1,       -- スヌーズ有効
+      snooze_minutes INTEGER DEFAULT 5,       -- スヌーズ時間（分）
+      smart_wakeup BOOLEAN DEFAULT 0,         -- スマートウェイクアップ
+      notification_id TEXT,                   -- expo-notifications の通知ID
+      created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
+      updated_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_alarms_enabled ON alarms(enabled);
+
+    CREATE TRIGGER IF NOT EXISTS update_alarms_timestamp
+    AFTER UPDATE ON alarms
+    BEGIN
+      UPDATE alarms SET updated_at = strftime('%s', 'now') WHERE id = NEW.id;
+    END;
+  `);
 
   console.log('✅ Database initialized successfully');
 }
@@ -688,6 +720,203 @@ export async function getTodayTasks(): Promise<Task[]> {
   );
 
   return results;
+}
+
+// ========================================
+// アラーム CRUD操作
+// ========================================
+
+/**
+ * アラームを保存（新規作成または更新）
+ */
+export async function saveAlarm(alarm: {
+  id?: number;
+  alarm_time: string;
+  enabled?: boolean;
+  repeat_days?: string[];
+  label?: string;
+  sound?: string;
+  snooze_enabled?: boolean;
+  snooze_minutes?: number;
+  smart_wakeup?: boolean;
+  notification_id?: string;
+}): Promise<number> {
+  if (isWeb) {
+    // Web用実装
+    if (alarm.id) {
+      const index = webDB.alarms.findIndex(a => a.id === alarm.id);
+      if (index !== -1) {
+        webDB.alarms[index] = {
+          ...webDB.alarms[index],
+          ...alarm,
+          repeat_days: alarm.repeat_days ? JSON.stringify(alarm.repeat_days) : null,
+          updated_at: Math.floor(Date.now() / 1000),
+        };
+        return alarm.id;
+      }
+    }
+    const newId = webDB.alarms.length > 0 ? Math.max(...webDB.alarms.map(a => a.id)) + 1 : 1;
+    webDB.alarms.push({
+      id: newId,
+      alarm_time: alarm.alarm_time,
+      enabled: alarm.enabled ?? true,
+      repeat_days: alarm.repeat_days ? JSON.stringify(alarm.repeat_days) : null,
+      label: alarm.label ?? null,
+      sound: alarm.sound ?? 'default',
+      snooze_enabled: alarm.snooze_enabled ?? true,
+      snooze_minutes: alarm.snooze_minutes ?? 5,
+      smart_wakeup: alarm.smart_wakeup ?? false,
+      notification_id: alarm.notification_id ?? null,
+      created_at: Math.floor(Date.now() / 1000),
+      updated_at: Math.floor(Date.now() / 1000),
+    });
+    return newId;
+  }
+
+  const database = await openDatabase();
+
+  if (alarm.id) {
+    // 更新
+    await runAsync(
+      database!,
+      `UPDATE alarms SET
+        alarm_time = ?,
+        enabled = ?,
+        repeat_days = ?,
+        label = ?,
+        sound = ?,
+        snooze_enabled = ?,
+        snooze_minutes = ?,
+        smart_wakeup = ?,
+        notification_id = ?
+      WHERE id = ?`,
+      [
+        alarm.alarm_time,
+        alarm.enabled ?? true,
+        alarm.repeat_days ? JSON.stringify(alarm.repeat_days) : null,
+        alarm.label ?? null,
+        alarm.sound ?? 'default',
+        alarm.snooze_enabled ?? true,
+        alarm.snooze_minutes ?? 5,
+        alarm.smart_wakeup ?? false,
+        alarm.notification_id ?? null,
+        alarm.id,
+      ]
+    );
+    return alarm.id;
+  } else {
+    // 新規作成
+    const result = await runAsync(
+      database!,
+      `INSERT INTO alarms (
+        alarm_time, enabled, repeat_days, label, sound,
+        snooze_enabled, snooze_minutes, smart_wakeup, notification_id
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        alarm.alarm_time,
+        alarm.enabled ?? true,
+        alarm.repeat_days ? JSON.stringify(alarm.repeat_days) : null,
+        alarm.label ?? null,
+        alarm.sound ?? 'default',
+        alarm.snooze_enabled ?? true,
+        alarm.snooze_minutes ?? 5,
+        alarm.smart_wakeup ?? false,
+        alarm.notification_id ?? null,
+      ]
+    );
+    return result.lastInsertRowId;
+  }
+}
+
+/**
+ * すべてのアラームを取得
+ */
+export async function getAlarms(): Promise<Alarm[]> {
+  if (isWeb) {
+    return webDB.alarms.map(a => ({
+      ...a,
+      repeat_days: a.repeat_days ? JSON.parse(a.repeat_days) : undefined,
+    }));
+  }
+
+  const database = await openDatabase();
+  const results = await getAllAsync<any>(
+    database!,
+    'SELECT * FROM alarms ORDER BY alarm_time ASC'
+  );
+
+  return results.map(a => ({
+    ...a,
+    enabled: Boolean(a.enabled),
+    snooze_enabled: Boolean(a.snooze_enabled),
+    smart_wakeup: Boolean(a.smart_wakeup),
+    repeat_days: a.repeat_days ? JSON.parse(a.repeat_days) : undefined,
+  }));
+}
+
+/**
+ * 特定のアラームを取得
+ */
+export async function getAlarm(id: number): Promise<Alarm | null> {
+  if (isWeb) {
+    const alarm = webDB.alarms.find(a => a.id === id);
+    if (!alarm) return null;
+    return {
+      ...alarm,
+      repeat_days: alarm.repeat_days ? JSON.parse(alarm.repeat_days) : undefined,
+    };
+  }
+
+  const database = await openDatabase();
+  const result = await getFirstAsync<any>(
+    database!,
+    'SELECT * FROM alarms WHERE id = ?',
+    [id]
+  );
+
+  if (!result) return null;
+
+  return {
+    ...result,
+    enabled: Boolean(result.enabled),
+    snooze_enabled: Boolean(result.snooze_enabled),
+    smart_wakeup: Boolean(result.smart_wakeup),
+    repeat_days: result.repeat_days ? JSON.parse(result.repeat_days) : undefined,
+  };
+}
+
+/**
+ * アラームを削除
+ */
+export async function deleteAlarm(id: number): Promise<void> {
+  if (isWeb) {
+    webDB.alarms = webDB.alarms.filter(a => a.id !== id);
+    return;
+  }
+
+  const database = await openDatabase();
+  await runAsync(database!, 'DELETE FROM alarms WHERE id = ?', [id]);
+}
+
+/**
+ * アラームの有効/無効を切り替え
+ */
+export async function toggleAlarm(id: number, enabled: boolean): Promise<void> {
+  if (isWeb) {
+    const alarm = webDB.alarms.find(a => a.id === id);
+    if (alarm) {
+      alarm.enabled = enabled;
+      alarm.updated_at = Math.floor(Date.now() / 1000);
+    }
+    return;
+  }
+
+  const database = await openDatabase();
+  await runAsync(
+    database!,
+    'UPDATE alarms SET enabled = ? WHERE id = ?',
+    [enabled, id]
+  );
 }
 
 // ========================================
