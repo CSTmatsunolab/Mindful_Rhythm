@@ -28,6 +28,7 @@ export type RootStackParamList = {
   SleepDiary: undefined;
   SleepRecording: undefined;
   AlarmSetting: undefined;
+  SleepinGenerator: undefined;
 };
 
 /**

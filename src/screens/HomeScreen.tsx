@@ -1,11 +1,14 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Animated, Image } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { Colors } from '../constants/Colors';
 import { Typography } from '../constants/Typography';
 import { HomeScreenNavigationProp } from '../types/navigation';
-import { getLatestSleepRecord, getTodayTasks } from '../services/database';
-import type { SleepRecord, Task } from '../types/database';
+import { getLatestSleepRecord, getTodayTasks, getUserProgress } from '../services/database';
+import type { SleepRecord, Task, UserProgress } from '../types/database';
+import { getSleepinImageFileName } from '../constants/SleepinPrompts';
+import { getImageKeyFromFileName, getSleepinImageUriSync } from '../constants/SleepinImages';
+import { isImageGenerated } from '../services/sleepinImageGenerator';
 
 interface Props {
   navigation: HomeScreenNavigationProp;
@@ -21,7 +24,13 @@ interface Props {
 export default function HomeScreen({ navigation }: Props) {
   const [sleepRecord, setSleepRecord] = useState<SleepRecord | null>(null);
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [userProgress, setUserProgress] = useState<UserProgress | null>(null);
   const [loading, setLoading] = useState(true);
+  const [sleepinImageUri, setSleepinImageUri] = useState<string | null>(null);
+
+  // アニメーション用
+  const sizeAnim = useRef(new Animated.Value(80)).current;
+  const scaleAnim = useRef(new Animated.Value(1)).current;
 
   const todayDate = new Date().toLocaleDateString('ja-JP', {
     month: 'long',
@@ -43,6 +52,25 @@ export default function HomeScreen({ navigation }: Props) {
       // 今日のタスクを取得
       const todayTasks = await getTodayTasks();
       setTasks(todayTasks);
+
+      // ユーザー進捗を取得
+      const progress = await getUserProgress();
+      setUserProgress(progress);
+
+      // スリーピン画像URIを取得
+      const fileName = getSleepinImageFileName(
+        latestSleep?.score,
+        progress?.total_growth_points || 0
+      );
+      const imageKey = getImageKeyFromFileName(fileName);
+      const imageExists = await isImageGenerated(fileName);
+
+      if (imageExists) {
+        const uri = getSleepinImageUriSync(imageKey);
+        setSleepinImageUri(uri);
+      } else {
+        setSleepinImageUri(null);
+      }
     } catch (error) {
       console.error('❌ Failed to load home screen data:', error);
     } finally {
@@ -66,6 +94,37 @@ export default function HomeScreen({ navigation }: Props) {
       loadData();
     }, [])
   );
+
+  /**
+   * スリーピンサイズが変更されたときにアニメーション実行
+   */
+  useEffect(() => {
+    if (userProgress) {
+      // サイズアニメーション
+      Animated.spring(sizeAnim, {
+        toValue: userProgress.sleepin_size,
+        friction: 3,
+        tension: 40,
+        useNativeDriver: false,
+      }).start();
+
+      // 成長時のパルスアニメーション
+      Animated.sequence([
+        Animated.spring(scaleAnim, {
+          toValue: 1.2,
+          friction: 3,
+          tension: 40,
+          useNativeDriver: false, // fontSizeと一緒に使うためfalseに変更
+        }),
+        Animated.spring(scaleAnim, {
+          toValue: 1,
+          friction: 3,
+          tension: 40,
+          useNativeDriver: false, // fontSizeと一緒に使うためfalseに変更
+        }),
+      ]).start();
+    }
+  }, [userProgress?.sleepin_size]);
 
   /**
    * 睡眠スコアに基づいてキャラクターの表情を決定
@@ -129,8 +188,39 @@ export default function HomeScreen({ navigation }: Props) {
       {/* Character Section */}
       <View style={styles.characterSection}>
         <View style={styles.characterContainer}>
-          <Text style={styles.characterEmoji}>{getCharacterEmoji()}</Text>
+          {sleepinImageUri ? (
+            // ローカルストレージから画像を表示
+            <Animated.Image
+              source={{ uri: sleepinImageUri }}
+              style={[
+                styles.characterImage,
+                {
+                  width: sizeAnim,
+                  height: sizeAnim,
+                  transform: [{ scale: scaleAnim }],
+                }
+              ]}
+              resizeMode="contain"
+            />
+          ) : (
+            // フォールバック：絵文字表示
+            <Animated.Text style={[
+              styles.characterEmoji,
+              {
+                fontSize: sizeAnim,
+                transform: [{ scale: scaleAnim }],
+              }
+            ]}>
+              {getCharacterEmoji()}
+            </Animated.Text>
+          )}
           <Text style={styles.characterName}>スリーピン</Text>
+          {userProgress && (
+            <View style={styles.progressInfo}>
+              <Text style={styles.levelText}>Lv.{userProgress.level}</Text>
+              <Text style={styles.pointsText}>{userProgress.total_growth_points}pt</Text>
+            </View>
+          )}
           {sleepRecord && (
             <Text style={styles.characterScore}>睡眠スコア: {sleepScore}点</Text>
           )}
@@ -281,6 +371,9 @@ const styles = StyleSheet.create({
     fontSize: 80,
     marginBottom: 8,
   },
+  characterImage: {
+    marginBottom: 8,
+  },
   characterName: {
     ...Typography.caption,
     color: Colors.textSecondary,
@@ -289,6 +382,23 @@ const styles = StyleSheet.create({
     ...Typography.caption,
     color: Colors.accent,
     marginTop: 4,
+  },
+  progressInfo: {
+    flexDirection: 'row',
+    marginTop: 8,
+    marginBottom: 4,
+  },
+  levelText: {
+    ...Typography.caption,
+    color: Colors.accent,
+    fontWeight: 'bold',
+    marginRight: 12,
+    fontSize: 14,
+  },
+  pointsText: {
+    ...Typography.caption,
+    color: Colors.textSecondary,
+    fontSize: 14,
   },
   scoreCard: {
     backgroundColor: Colors.surface,

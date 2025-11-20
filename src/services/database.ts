@@ -9,7 +9,7 @@
 
 import * as SQLite from 'expo-sqlite';
 import { Platform } from 'react-native';
-import { SleepRecord, Task, DailyMission, Alarm } from '../types/database';
+import { SleepRecord, Task, DailyMission, Alarm, UserProgress } from '../types/database';
 
 let db: SQLite.SQLiteDatabase | null = null;
 const isWeb = Platform.OS === 'web';
@@ -275,6 +275,33 @@ async function initializeDatabase(): Promise<void> {
     BEGIN
       UPDATE alarms SET updated_at = strftime('%s', 'now') WHERE id = NEW.id;
     END;
+  `);
+
+  // ========================================
+  // 7. user_progress テーブル（スリーピン育成）
+  // ========================================
+  await execAsync(db, `
+    CREATE TABLE IF NOT EXISTS user_progress (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      total_growth_points INTEGER NOT NULL DEFAULT 0,  -- 累計成長ポイント
+      sleepin_size INTEGER NOT NULL DEFAULT 80,        -- スリーピンサイズ（px）
+      level INTEGER NOT NULL DEFAULT 1,                -- レベル
+      created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
+      updated_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now'))
+    );
+
+    CREATE TRIGGER IF NOT EXISTS update_user_progress_timestamp
+    AFTER UPDATE ON user_progress
+    BEGIN
+      UPDATE user_progress SET updated_at = strftime('%s', 'now') WHERE id = NEW.id;
+    END;
+  `);
+
+  // 初期データ投入（ユーザー進捗レコード1件のみ）
+  console.log('📝 Initializing user progress...');
+  await execAsync(db, `
+    INSERT OR IGNORE INTO user_progress (id, total_growth_points, sleepin_size, level)
+    VALUES (1, 0, 80, 1);
   `);
 
   console.log('✅ Database initialized successfully');
@@ -917,6 +944,109 @@ export async function toggleAlarm(id: number, enabled: boolean): Promise<void> {
     'UPDATE alarms SET enabled = ? WHERE id = ?',
     [enabled, id]
   );
+}
+
+// ========================================
+// ユーザー成長進捗 CRUD操作
+// ========================================
+
+/**
+ * ユーザー進捗を取得
+ */
+export async function getUserProgress(): Promise<UserProgress> {
+  if (isWeb) {
+    // Web用実装（デフォルト値返す）
+    return {
+      id: 1,
+      total_growth_points: 0,
+      sleepin_size: 80,
+      level: 1,
+      created_at: Math.floor(Date.now() / 1000),
+      updated_at: Math.floor(Date.now() / 1000),
+    };
+  }
+
+  const database = await openDatabase();
+  const result = await getFirstAsync<UserProgress>(
+    database!,
+    'SELECT * FROM user_progress WHERE id = 1'
+  );
+
+  // レコードが存在しない場合は初期値を返す
+  if (!result) {
+    return {
+      id: 1,
+      total_growth_points: 0,
+      sleepin_size: 80,
+      level: 1,
+      created_at: Math.floor(Date.now() / 1000),
+      updated_at: Math.floor(Date.now() / 1000),
+    };
+  }
+
+  return result;
+}
+
+/**
+ * 成長ポイントを加算
+ * @param points 加算するポイント数
+ */
+export async function addGrowthPoints(points: number): Promise<UserProgress> {
+  if (isWeb) {
+    // Web用実装（仮）
+    return {
+      id: 1,
+      total_growth_points: points,
+      sleepin_size: 80 + points * 2,
+      level: Math.floor(points / 10) + 1,
+      created_at: Math.floor(Date.now() / 1000),
+      updated_at: Math.floor(Date.now() / 1000),
+    };
+  }
+
+  const database = await openDatabase();
+
+  // 現在のポイントを取得
+  const current = await getUserProgress();
+  const newTotalPoints = current.total_growth_points + points;
+
+  // スリーピンサイズを計算（初期80px + ポイント×2px、上限なし）
+  const newSize = 80 + newTotalPoints * 2;
+
+  // レベルを計算（10ポイントで1レベル）
+  const newLevel = Math.floor(newTotalPoints / 10) + 1;
+
+  // 更新
+  await runAsync(
+    database!,
+    `UPDATE user_progress SET
+      total_growth_points = ?,
+      sleepin_size = ?,
+      level = ?
+    WHERE id = 1`,
+    [newTotalPoints, newSize, newLevel]
+  );
+
+  return await getUserProgress();
+}
+
+/**
+ * タスク完了時に難易度に応じた成長ポイントを加算
+ * @param difficulty タスクの難易度（1-5）
+ */
+export async function addTaskGrowthPoints(difficulty: number | null): Promise<UserProgress> {
+  // 難易度に応じたポイント計算
+  // 難易度1: 1pt, 難易度2: 2pt, 難易度3: 3pt, 難易度4: 5pt, 難易度5: 8pt
+  const pointsMap: Record<number, number> = {
+    1: 1,
+    2: 2,
+    3: 3,
+    4: 5,
+    5: 8,
+  };
+
+  const points = difficulty ? (pointsMap[difficulty] || 1) : 1;
+  return await addGrowthPoints(points);
 }
 
 // ========================================

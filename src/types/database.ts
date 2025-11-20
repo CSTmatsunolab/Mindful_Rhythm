@@ -115,3 +115,15 @@ export interface SleepScoreResult {
     environment: number;
   };
 }
+
+/**
+ * ユーザー成長進捗（スリーピン育成）
+ */
+export interface UserProgress {
+  id: number;
+  total_growth_points: number;     // 累計成長ポイント
+  sleepin_size: number;             // スリーピンのサイズ（計算用）
+  level: number;                    // レベル（オプション）
+  created_at: number;               // UNIX timestamp
+  updated_at: number;               // UNIX timestamp
+}

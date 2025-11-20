@@ -34,6 +34,7 @@ import {
   getTasksByDate,
   updateTaskStatus,
   deleteTask,
+  addTaskGrowthPoints,
 } from '../services/database';
 import { Task } from '../types/database';
 import EmotionPicker from '../components/EmotionPicker';
@@ -157,9 +158,31 @@ export default function TaskJournalScreen() {
     if (selectedTaskId === null) return;
 
     try {
+      // タスクを完了にする
       await updateTaskStatus(selectedTaskId, 'done', emotion);
+
+      // 完了したタスクの難易度を取得
+      const completedTask = tasks.find(t => t.id === selectedTaskId);
+      const taskDifficulty = completedTask?.difficulty || null;
+
+      // 成長ポイントを加算
+      const progress = await addTaskGrowthPoints(taskDifficulty);
+
+      // 難易度に応じたポイント計算
+      const pointsEarned = taskDifficulty
+        ? ({ 1: 1, 2: 2, 3: 3, 4: 5, 5: 8 }[taskDifficulty] || 1)
+        : 1;
+
       await loadTasks();
-      console.log(`✅ Task ${selectedTaskId} completed with emotion: ${emotion}`);
+
+      // 成長通知を表示
+      Alert.alert(
+        '🎉 タスク完了！',
+        `スリーピンが成長しました！\n+${pointsEarned}pt (合計: ${progress.total_growth_points}pt)\nレベル: ${progress.level}`,
+        [{ text: 'OK' }]
+      );
+
+      console.log(`✅ Task ${selectedTaskId} completed with emotion: ${emotion}, earned ${pointsEarned} growth points`);
     } catch (error) {
       console.error('❌ Error updating task status:', error);
       Alert.alert('エラー', 'タスクの更新に失敗しました');

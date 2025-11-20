@@ -10,6 +10,7 @@ import TabNavigator from './TabNavigator';
 // Screens
 import SleepRecordingScreen from '../screens/SleepRecordingScreen';
 import AlarmSettingScreen from '../screens/AlarmSettingScreen';
+import SleepinGeneratorScreen from '../screens/SleepinGeneratorScreen';
 
 const Stack = createStackNavigator<RootStackParamList>();
 
@@ -50,6 +51,22 @@ export default function AppNavigator() {
           options={{
             headerShown: true,
             title: 'アラーム設定',
+            headerStyle: {
+              backgroundColor: Colors.primary,
+            },
+            headerTintColor: Colors.text,
+            headerTitleStyle: {
+              fontSize: 18,
+              fontWeight: '600',
+            },
+          }}
+        />
+        <Stack.Screen
+          name="SleepinGenerator"
+          component={SleepinGeneratorScreen}
+          options={{
+            headerShown: true,
+            title: 'スリーピン画像生成',
             headerStyle: {
               backgroundColor: Colors.primary,
             },
