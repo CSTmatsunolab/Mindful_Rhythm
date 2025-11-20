@@ -22,106 +22,114 @@ export interface SleepinPrompt {
  */
 export const SLEEPIN_PROMPTS: SleepinPrompt[] = [
   // ========================================
-  // 睡眠の質：悪い（poor）
+  // 睡眠の質：悪い（poor）- 悪魔モチーフ
   // ========================================
   {
     sleepQuality: 'poor',
     growthStage: 'initial',
     fileName: 'sleepin_poor_initial.png',
-    description: '睡眠不足で疲れた小さなスリーピン',
-    prompt: `A cute sleepy character mascot, small size, tired expression, dark circles under eyes,
-yawning pose, soft pastel colors with dull tones, chibi style, kawaii anime aesthetic,
-simple background, digital illustration, high quality, adorable but exhausted look,
-representing poor sleep quality, beginner stage`
+    description: '小さな悪魔風スリーピン（ツノのみ）',
+    prompt: `A cute round-shaped character named Sleepin, sleep mascot character, adorable kawaii style,
+small devil horns on head, NO wings, chibi deformed proportions, simple and minimal design,
+soft pastel colors, gentle expression, completely plain white background, no text or letters,
+digital illustration, character design, mascot art`
   },
   {
     sleepQuality: 'poor',
     growthStage: 'intermediate',
     fileName: 'sleepin_poor_intermediate.png',
-    description: '少し成長したが疲れた表情のスリーピン',
-    prompt: `A cute sleepy character mascot, medium size, still tired but slightly more energetic,
-faint dark circles, half-closed eyes, soft pastel colors with muted tones, chibi style,
-kawaii anime aesthetic, simple background, digital illustration, high quality,
-showing signs of growth but still representing poor sleep quality, intermediate stage`
+    description: '中型悪魔風スリーピン（ツノ＋翼）',
+    prompt: `A cute round-shaped character named Sleepin, sleep mascot character, adorable kawaii style,
+devil horns on head AND small bat wings, more devil-like appearance than initial form,
+chibi deformed proportions, medium size, soft pastel colors with slightly darker tones,
+gentle expression, completely plain white background, no text or letters,
+digital illustration, character design, mascot art`
   },
   {
     sleepQuality: 'poor',
     growthStage: 'final',
     fileName: 'sleepin_poor_final.png',
-    description: '大きくなったが眠そうなスリーピン',
-    prompt: `A cute sleepy character mascot, large size, mature form but still sleepy,
-subtle tired expression, gentle smile but drowsy eyes, soft pastel colors with warm undertones,
-chibi style, kawaii anime aesthetic, simple background, digital illustration, high quality,
-fully grown but representing ongoing poor sleep quality, final form`
+    description: '大型悪魔風スリーピン（ツノ＋翼＋武器）',
+    prompt: `A cute round-shaped character named Sleepin, sleep mascot character, adorable kawaii style,
+devil horns on head AND bat wings, holding a cute weapon (trident or staff), full devil-like appearance,
+chibi deformed proportions, large size, soft pastel colors with darker accents,
+gentle but powerful expression, completely plain white background, no text or letters,
+digital illustration, character design, mascot art`
   },
 
   // ========================================
-  // 睡眠の質：普通（normal）
+  // 睡眠の質：普通（normal）- シンプルモチーフ
   // ========================================
   {
     sleepQuality: 'normal',
     growthStage: 'initial',
     fileName: 'sleepin_normal_initial.png',
-    description: '元気な小さなスリーピン',
-    prompt: `A cute sleepy character mascot, small size, content expression, peaceful eyes,
-gentle smile, balanced pastel colors, chibi style, kawaii anime aesthetic,
-simple background, digital illustration, high quality, representing normal sleep quality,
-healthy and calm look, beginner stage`
+    description: '小さくシンプルなスリーピン',
+    prompt: `A very simple and normal cute round-shaped character named Sleepin, sleep mascot character,
+adorable kawaii style, VERY small and minimal design, no horns, no wings, no accessories,
+plain simple round body, chibi deformed proportions, soft neutral pastel colors,
+peaceful gentle expression, completely plain white background, no text or letters,
+digital illustration, character design, mascot art, minimalist style`
   },
   {
     sleepQuality: 'normal',
     growthStage: 'intermediate',
     fileName: 'sleepin_normal_intermediate.png',
-    description: '健康的に成長したスリーピン',
-    prompt: `A cute sleepy character mascot, medium size, cheerful expression, bright eyes,
-happy smile, vibrant pastel colors, chibi style, kawaii anime aesthetic,
-simple background, digital illustration, high quality, representing normal sleep quality,
-energetic and balanced look, intermediate stage`
+    description: '中型でシンプルなスリーピン',
+    prompt: `A very simple and normal cute round-shaped character named Sleepin, sleep mascot character,
+adorable kawaii style, medium size (larger than initial form), no horns, no wings, no accessories,
+plain simple round body, chibi deformed proportions, soft neutral pastel colors,
+peaceful gentle expression, completely plain white background, no text or letters,
+digital illustration, character design, mascot art, minimalist style`
   },
   {
     sleepQuality: 'normal',
     growthStage: 'final',
     fileName: 'sleepin_normal_final.png',
-    description: '立派に育った健康的なスリーピン',
-    prompt: `A cute sleepy character mascot, large size, confident expression, sparkling eyes,
-warm smile, rich pastel colors, chibi style, kawaii anime aesthetic,
-simple background, digital illustration, high quality, representing normal sleep quality,
-fully grown with balanced health, final form`
+    description: '大型でシンプルなスリーピン',
+    prompt: `A very simple and normal cute round-shaped character named Sleepin, sleep mascot character,
+adorable kawaii style, large size (larger than intermediate form), no horns, no wings, no accessories,
+plain simple round body, chibi deformed proportions, soft neutral pastel colors,
+peaceful gentle expression, completely plain white background, no text or letters,
+digital illustration, character design, mascot art, minimalist style`
   },
 
   // ========================================
-  // 睡眠の質：良い（good）
+  // 睡眠の質：良い（good）- 天使モチーフ
   // ========================================
   {
     sleepQuality: 'good',
     growthStage: 'initial',
     fileName: 'sleepin_good_initial.png',
-    description: '最高の睡眠で輝く小さなスリーピン',
-    prompt: `A cute sleepy character mascot, small size, radiant expression, sparkling eyes,
-joyful smile, glowing aura, bright vibrant pastel colors, chibi style, kawaii anime aesthetic,
-simple background with subtle sparkles, digital illustration, high quality,
-representing excellent sleep quality, energetic and glowing look, beginner stage`
+    description: '小さな天使風スリーピン（輪っか＋小さい羽）',
+    prompt: `A cute round-shaped character named Sleepin, sleep mascot character, adorable kawaii style,
+angel halo floating above head AND small simple wings, angelic appearance,
+chibi deformed proportions, small size, soft bright pastel colors with gentle glow,
+peaceful happy expression, completely plain white background, no text or letters,
+digital illustration, character design, mascot art`
   },
   {
     sleepQuality: 'good',
     growthStage: 'intermediate',
     fileName: 'sleepin_good_intermediate.png',
-    description: '最高の睡眠で輝く中型スリーピン',
-    prompt: `A cute sleepy character mascot, medium size, brilliant expression, shining eyes,
-big happy smile, glowing aura, vibrant rainbow pastel colors, chibi style, kawaii anime aesthetic,
-background with gentle sparkles and light effects, digital illustration, high quality,
-representing excellent sleep quality, radiant and energetic, intermediate stage`
+    description: '中型天使風スリーピン（輪っか＋大きい翼）',
+    prompt: `A cute round-shaped character named Sleepin, sleep mascot character, adorable kawaii style,
+angel halo floating above head AND large beautiful wings, angelic appearance,
+chibi deformed proportions, medium size, bright vibrant pastel colors with glowing aura,
+joyful radiant expression, completely plain white background, no text or letters,
+digital illustration, character design, mascot art`
   },
   {
     sleepQuality: 'good',
     growthStage: 'final',
     fileName: 'sleepin_good_final.png',
-    description: '究極の形態！黄金に輝く最強スリーピン',
-    prompt: `A cute sleepy character mascot, very large size, majestic expression,
-brilliant sparkling eyes, radiant smile, golden glowing aura, luxurious vibrant colors
-with gold accents, chibi style, kawaii anime aesthetic, background with magical sparkles
-and light rays, digital illustration, high quality, representing perfect sleep quality,
-ultimate evolved form with divine presence, final legendary form`
+    description: '大型天使風スリーピン（輪っか＋大きい翼＋武器）',
+    prompt: `A cute round-shaped character named Sleepin, sleep mascot character, adorable kawaii style,
+angel halo floating above head AND large majestic wings, holding a cute holy weapon (staff or wand),
+full angelic appearance, chibi deformed proportions, large size,
+bright golden pastel colors with radiant glowing aura, divine powerful expression,
+completely plain white background, no text or letters,
+digital illustration, character design, mascot art`
   },
 ];
 
