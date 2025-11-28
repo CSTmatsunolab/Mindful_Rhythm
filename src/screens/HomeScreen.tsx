@@ -4,11 +4,12 @@ import { useFocusEffect } from '@react-navigation/native';
 import { Colors } from '../constants/Colors';
 import { Typography } from '../constants/Typography';
 import { HomeScreenNavigationProp } from '../types/navigation';
-import { getLatestSleepRecord, getTodayTasks, getUserProgress } from '../services/database';
+import { getLatestSleepRecord, getTodayTasks, getUserProgress, getRecentSleepRecords } from '../services/database';
 import type { SleepRecord, Task, UserProgress } from '../types/database';
 import { getSleepinImageFileName } from '../constants/SleepinPrompts';
 import { getImageKeyFromFileName, getSleepinImageUriSync } from '../constants/SleepinImages';
 import { isImageGenerated } from '../services/sleepinImageGenerator';
+import SleepRecordChart from '../components/SleepRecordChart';
 
 interface Props {
   navigation: HomeScreenNavigationProp;
@@ -23,6 +24,8 @@ interface Props {
  */
 export default function HomeScreen({ navigation }: Props) {
   const [sleepRecord, setSleepRecord] = useState<SleepRecord | null>(null);
+  const [recentSleepRecords, setRecentSleepRecords] = useState<SleepRecord[]>([]);
+  const [averageScore, setAverageScore] = useState<number | null>(null);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [userProgress, setUserProgress] = useState<UserProgress | null>(null);
   const [loading, setLoading] = useState(true);
@@ -49,6 +52,26 @@ export default function HomeScreen({ navigation }: Props) {
       const latestSleep = await getLatestSleepRecord();
       setSleepRecord(latestSleep);
 
+      // 直近5日間の睡眠記録を取得
+      const recentRecords = await getRecentSleepRecords(5);
+      setRecentSleepRecords(recentRecords);
+
+      // 直近5日間の平均スコアを計算
+      if (recentRecords.length > 0) {
+        const validScores = recentRecords
+          .map(r => r.score)
+          .filter((score): score is number => score !== null && score !== undefined);
+
+        if (validScores.length > 0) {
+          const avg = validScores.reduce((sum, score) => sum + score, 0) / validScores.length;
+          setAverageScore(Math.round(avg));
+        } else {
+          setAverageScore(null);
+        }
+      } else {
+        setAverageScore(null);
+      }
+
       // 今日のタスクを取得
       const todayTasks = await getTodayTasks();
       setTasks(todayTasks);
@@ -57,20 +80,7 @@ export default function HomeScreen({ navigation }: Props) {
       const progress = await getUserProgress();
       setUserProgress(progress);
 
-      // スリーピン画像URIを取得
-      const fileName = getSleepinImageFileName(
-        latestSleep?.score,
-        progress?.total_growth_points || 0
-      );
-      const imageKey = getImageKeyFromFileName(fileName);
-      const imageExists = await isImageGenerated(fileName);
-
-      if (imageExists) {
-        const uri = getSleepinImageUriSync(imageKey);
-        setSleepinImageUri(uri);
-      } else {
-        setSleepinImageUri(null);
-      }
+      // 注意: スリーピン画像URIはuseEffectで更新されます（averageScore変更時）
     } catch (error) {
       console.error('❌ Failed to load home screen data:', error);
     } finally {
@@ -127,12 +137,38 @@ export default function HomeScreen({ navigation }: Props) {
   }, [userProgress?.sleepin_size]);
 
   /**
-   * 睡眠スコアに基づいてキャラクターの表情を決定
+   * 平均スコアが変更されたときにスリーピン画像URIを更新
+   */
+  useEffect(() => {
+    const updateSleepinImage = async () => {
+      if (!userProgress) return;
+
+      const scoreForImage = averageScore !== null ? averageScore : sleepRecord?.score;
+      const fileName = getSleepinImageFileName(
+        scoreForImage,
+        userProgress.total_growth_points || 0
+      );
+      const imageKey = getImageKeyFromFileName(fileName);
+      const imageExists = await isImageGenerated(fileName);
+
+      if (imageExists) {
+        const uri = getSleepinImageUriSync(imageKey);
+        setSleepinImageUri(uri);
+      } else {
+        setSleepinImageUri(null);
+      }
+    };
+
+    updateSleepinImage();
+  }, [averageScore, sleepRecord, userProgress]);
+
+  /**
+   * 睡眠スコアに基づいてキャラクターの表情を決定（平均スコアを使用）
    */
   const getCharacterEmoji = (): string => {
-    if (!sleepRecord) return '😴'; // データなし
+    const score = averageScore !== null ? averageScore : sleepRecord?.score;
+    if (!score) return '😴'; // データなし
 
-    const score = sleepRecord.score;
     if (score >= 90) return '😊'; // 優秀
     if (score >= 80) return '🙂'; // 良好
     if (score >= 70) return '😐'; // 普通
@@ -141,12 +177,12 @@ export default function HomeScreen({ navigation }: Props) {
   };
 
   /**
-   * 睡眠スコアに基づいてラベルを決定
+   * 睡眠スコアに基づいてラベルを決定（平均スコアを使用）
    */
   const getScoreLabel = (): string => {
-    if (!sleepRecord) return 'データがありません';
+    const score = averageScore !== null ? averageScore : sleepRecord?.score;
+    if (!score) return 'データがありません';
 
-    const score = sleepRecord.score;
     if (score >= 90) return 'とても良い睡眠です！';
     if (score >= 80) return '良好な睡眠です';
     if (score >= 70) return 'まずまずの睡眠です';
@@ -221,8 +257,8 @@ export default function HomeScreen({ navigation }: Props) {
               <Text style={styles.pointsText}>{userProgress.total_growth_points}pt</Text>
             </View>
           )}
-          {sleepRecord && (
-            <Text style={styles.characterScore}>睡眠スコア: {sleepScore}点</Text>
+          {averageScore !== null && (
+            <Text style={styles.characterScore}>平均睡眠スコア: {averageScore}点（5日間平均）</Text>
           )}
         </View>
       </View>
@@ -233,11 +269,11 @@ export default function HomeScreen({ navigation }: Props) {
         onPress={() => navigation.navigate('SleepTracker')}
         accessibilityLabel="睡眠スコアカード。タップして睡眠記録画面へ"
       >
-        <Text style={styles.scoreTitle}>昨日の睡眠スコア</Text>
-        {sleepRecord ? (
+        <Text style={styles.scoreTitle}>直近5日間の平均睡眠スコア</Text>
+        {averageScore !== null ? (
           <>
             <View style={styles.scoreCircle}>
-              <Text style={styles.scoreValue}>{sleepScore}</Text>
+              <Text style={styles.scoreValue}>{averageScore}</Text>
               <Text style={styles.scoreUnit}>点</Text>
             </View>
             <View style={styles.scoreBar}>
@@ -246,20 +282,23 @@ export default function HomeScreen({ navigation }: Props) {
                   key={i}
                   style={[
                     styles.scoreBarItem,
-                    { backgroundColor: i < Math.floor((sleepScore / 100) * 7) ? Colors.accent : Colors.border },
+                    { backgroundColor: i < Math.floor((averageScore / 100) * 7) ? Colors.accent : Colors.border },
                   ]}
                 />
               ))}
             </View>
             <Text style={styles.scoreLabel}>{getScoreLabel()}</Text>
             <Text style={styles.scoreDetail}>
-              睡眠時間: {sleepRecord.total_hours.toFixed(1)}時間
+              記録数: {recentSleepRecords.length}日分
             </Text>
           </>
         ) : (
           <Text style={styles.noDataText}>まだ睡眠記録がありません{'\n'}記録を追加しましょう</Text>
         )}
       </TouchableOpacity>
+
+      {/* Sleep Record Chart */}
+      <SleepRecordChart records={recentSleepRecords} />
 
       {/* Today's Tasks Section */}
       <View style={styles.tasksSection}>
